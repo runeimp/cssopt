@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/runeimp/cssopt/configuration"
 	"github.com/runeimp/cssopt/parser"
 	"github.com/runeimp/termlog"
 )
@@ -16,32 +17,21 @@ const (
 )
 
 var (
-	tlog      *termlog.Logger
+	tlog      = termlog.New()
 	optimizer *Optimizer
 )
 
 type Optimizer struct {
-	cache             string
-	enableCaching     bool
-	enableGzip        bool
-	processed         time.Time
-	mergeImports      bool
-	killVars          bool
-	killComments      bool
-	killNewlines      bool
-	killSpaces        bool
-	killTabs          bool
-	killLastSemicolon bool
-	optimizeColors    bool
-	saveOptComments   bool
-	saveHeaderComment bool
-	saveLegalComment  bool
-	source            []string
+	cache     string
+	config    *configuration.Config
+	processed time.Time
+	source    []string
 }
 
 func (opt *Optimizer) processFilePath(path string) (result *parser.CssFile, err error) {
 	var fileBytes []byte
 
+	tlog.Level = termlog.WarnLevel
 	tlog.Info("optimizer.processFilePath() | path: %q", path)
 
 	// fileBytes, err = os.ReadFile(path)
@@ -58,6 +48,7 @@ func (opt *Optimizer) processFilePath(path string) (result *parser.CssFile, err 
 	tlog.Debug("optimizer.processFilePath() | fileBytes: %q", string(fileBytes))
 
 	proc := parser.NewCSS(path)
+	proc.Config = opt.config
 	result, err = proc.Run()
 	if err != nil {
 		return result, err
@@ -149,13 +140,15 @@ func (opt *Optimizer) ProcessPath(path string) (result string, err error) {
 }
 
 func init() {
-	tlog = termlog.New()
+	// tlog = termlog.New()
 	tlog.Level = termlog.InfoLevel
 }
 
-func GetOptimizer() *Optimizer {
+func GetOptimizer(conf *configuration.Config) *Optimizer {
 	if optimizer == nil {
-		optimizer = &Optimizer{}
+		optimizer = &Optimizer{
+			config: conf,
+		}
 	}
 
 	return optimizer

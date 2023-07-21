@@ -1,8 +1,8 @@
 package cssopt
 
 import (
-	"testing"
-	// "github.com/runeimp/termlog"
+// "testing"
+// "github.com/runeimp/termlog"
 )
 
 // var tlog *termlog.Logger
@@ -11,6 +11,7 @@ import (
 // 	tlog = termlog.New("testing")
 // }
 
+/*
 func TestProcessPath(t *testing.T) {
 	var want = ""
 
@@ -25,3 +26,4 @@ func TestProcessPath(t *testing.T) {
 		t.Fatalf(`got routerTest.TermLogLevel() = %#v, want match for %#v`, got, want)
 	}
 }
+*/

@@ -24,8 +24,8 @@ shebang := if os() == 'windows' { 'powershell' } else { '/usr/bin/env pwsh' } # 
 
 
 # Run code with (optional) arguments
-run *args='0 0.1234 .00000 4000 1 2. 42.12345678910111213 13.69': _term-wipe
-	go run {{MAIN_CODE}} {{args}}
+run *args='css/main.css': _term-wipe
+	go run {{CLI_CODE}} {{args}}
 
 
 # Wipe Terminal Buffer and Scrollback Buffer

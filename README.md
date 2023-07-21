@@ -10,6 +10,8 @@ Goals
 * Optimizations
 	* [ ] Merge `@import`ed CSS files adding comments denoting such
 	* [ ] Compile CSS Variables
+	* [ ] `data_url()` ala CSS-Crush [data-uri][data-uri - CSS-Crush]
+	* [ ] `math()` ala CSS-Crush [math()][math() - CSS-Crush]
 * Minification Options
 	* [ ] Remove comments
 		* [ ] Leave CSS Optimizer comments
@@ -65,5 +67,13 @@ When I was primary using PHP on the back-end I loved the idea of a PHP based CSS
 [sindresorhus/gulp-myth: \[DEPRECATED\] Myth - Postprocessor that polyfills CSS]: https://github.com/sindresorhus/gulp-myth
 [segmentio/myth: A CSS preprocessor that acts like a polyfill for future versions of the spec.]: https://github.com/segmentio/myth/
 [Is this project still maintained? · Issue #150 · segmentio/myth]: https://github.com/segmentio/myth/issues/150
+[data-uri - CSS-Crush]: https://the-echoplex.net/csscrush/#core--functions--data-uri
+[math() - CSS-Crush]: https://the-echoplex.net/csscrush/#core--functions--math
+
+[css package - github.com/tdewolff/parse/css - Go Packages]: https://pkg.go.dev/github.com/tdewolff/parse/css#section-readme
+[tdewolff/parse: Go parsers for web formats]: https://github.com/tdewolff/parse
+
+[napsy/go-css: A very simple CSS parser, written in Go]: https://github.com/napsy/go-css
+
 
 
