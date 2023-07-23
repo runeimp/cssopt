@@ -7,39 +7,6 @@ import (
 	"github.com/runeimp/termlog"
 )
 
-/*
-const (
-
-	hexAsterisk       = 0x2A
-	hexAt             = 0x40
-	hexCarriageReturn = 0x0D
-	hexEscape         = 0x5C
-	hexLineFeed       = 0x0A
-	hexSlash          = 0x2F
-
-)
-
-const (
-
-	hexSpace      = 0x20
-	hexCHARc      = 0x63
-	hexCHARd      = 0x62
-	hexCHARf      = 0x64
-	hexCHARi      = 0x69
-	hexCHARk      = 0x6B
-	hexCHARl      = 0x6C
-	hexCHARm      = 0x6D
-	hexCHARn      = 0x6E
-	hexCHARo      = 0x6F
-	hexCHARp      = 0x70
-	hexCHARs      = 0x73
-	hexCHARt      = 0x74
-	hexCHARu      = 0x75
-	hexParenRight = 0x29
-	hexSemicolon  = 0x3B
-
-)
-*/
 const (
 	TokenCarriageReturn      TokenType = "Carriage Return"
 	TokenAtRule              TokenType = "At-Rule"
@@ -63,6 +30,8 @@ const (
 	TokenText                TokenType = "Text"
 	TokenUnknown             TokenType = "Token Unknown"
 )
+
+var tlog = termlog.New()
 
 type TokenType string
 
@@ -133,8 +102,8 @@ func (lex *Lexer) Run(src []byte) {
 				tlog.Debug("lexer.Run() | At-Rule | %05d | 0x%02X | part: %q", i, b, part)
 				switch part {
 				case "@cha":
-					// tok.Type = TokenAtCharSet
-					tok.Type = TokenAtRule
+					tok.Type = TokenAtCharSet
+					// tok.Type = TokenAtRule
 				case "@col":
 					// tok.Type = TokenAtColorProfile
 					tok.Type = TokenAtRule
@@ -310,11 +279,6 @@ func New() *Lexer {
 	}
 }
 
-var (
-	tlog *termlog.Logger
-)
-
 func init() {
-	tlog = termlog.New()
-	tlog.Level = termlog.InfoLevel
+	tlog.Level = termlog.WarnLevel
 }

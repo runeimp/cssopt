@@ -26,6 +26,6 @@ func main() {
 	if err != nil {
 		tlog.Fatal(err.Error())
 	}
-	tlog.Info("cssopt CLI | css: %s", css)
+	tlog.Info("cssopt CLI | len(css): %d | css:\n%s", len(css), css)
 
 }

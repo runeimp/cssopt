@@ -1,9 +1,11 @@
 package parser
 
 import (
-	// "fmt"
+	"encoding/json"
 	"os"
+	"path"
 	"regexp"
+	"strings"
 
 	"github.com/runeimp/cssopt/configuration"
 	"github.com/runeimp/cssopt/parser/lexer"
@@ -12,21 +14,86 @@ import (
 
 var (
 	regexCSSimports = regexp.MustCompile(`@import +(?:url\()?["']?([0-9a-zA-Z_:/.?-]+)`)
+	regexAtCharset  = regexp.MustCompile(`@charset ['"]?[a-zA-Z0-9-]+['"]?;?`)
 	tlog            = termlog.New()
 )
 
 type CssFile struct {
 	body            string
-	imports         []string
+	imports         map[string]AtImport
 	path            string
 	processComplete bool
 	source          []byte
 }
 
-type ParserCSS struct {
-	bytes  []byte
-	Config *configuration.Config
+func (cf *CssFile) AddImport(ai AtImport) {
+	cf.imports[ai.name] = ai
+}
+
+func (cf *CssFile) GetBody() string {
+	return cf.body
+}
+
+func (cf *CssFile) GetBodyLength() int {
+	return len(cf.body)
+}
+
+func (cf *CssFile) GetImports() map[string]AtImport {
+	return cf.imports
+}
+
+func (cf *CssFile) GetPath() string {
+	return cf.path
+}
+
+func (cf *CssFile) ReplaceImport(key, value string) string {
+	value = regexAtCharset.ReplaceAllString(value, "")
+	cf.body = strings.Replace(cf.body, key, value, 1)
+	return cf.body
+}
+
+func (cf *CssFile) String() string {
+	dict := make(map[string]any)
+	dict["path"] = cf.path
+	dict["complete"] = cf.processComplete  // fmt.Sprintf("%t", cf.processComplete)
+	dict["length_body"] = len(cf.body)     // fmt.Sprintf("%d", len(cf.body))
+	dict["length_source"] = len(cf.source) // fmt.Sprintf("%d", len(cf.source))
+	// dict["length_imports"] = len(cf.imports) // fmt.Sprintf("%d", len(cf.source))
+
+	jsonData, err := json.MarshalIndent(dict, "", "\t")
+	if err != nil {
+		tlog.Fatal(err)
+	}
+	return string(jsonData)
+}
+
+type AtImport struct {
+	name   string
 	path   string
+	source string
+}
+
+func (ai *AtImport) GetPath() string {
+	return ai.path
+}
+
+func (ai *AtImport) String() string {
+	m := make(map[string]string)
+	m["name"] = ai.name
+	m["path"] = ai.path
+	m["source"] = ai.source
+	bytes, err := json.MarshalIndent(m, "", "\t")
+	if err != nil {
+		return err.Error()
+	}
+	return string(bytes)
+}
+
+type ParserCSS struct {
+	bytes   []byte
+	Config  *configuration.Config
+	imports map[string]AtImport
+	path    string
 }
 
 func (p *ParserCSS) getFile() ([]byte, error) {
@@ -41,33 +108,40 @@ func (p *ParserCSS) getFile() ([]byte, error) {
 	return p.bytes, nil
 }
 
+func (p *ParserCSS) GetImports() map[string]AtImport {
+	return p.imports
+}
+
 func (p *ParserCSS) Run(bytes ...[]byte) (css *CssFile, err error) {
+	tlog.Debug("parserCSS.Run() | len(bytes): %d", len(bytes))
 	var (
 		firstPass  []lexer.Token
-		imports    = []string{}
 		secondPass []lexer.Token
 	)
 
 	css = &CssFile{
-		path: p.path,
+		imports: make(map[string]AtImport),
+		path:    p.path,
 	}
-
-	tlog := termlog.New()
-	tlog.Level = termlog.WarnLevel
 
 	if len(bytes) > 0 {
 		p.bytes = bytes[0]
+		css.source = bytes[0] // NOTE: probably don't need this
 	} else {
 		p.bytes, err = p.getFile()
+		if err != nil {
+			return nil, err
+		}
 	}
+	tlog.Info("parserCSS.Run() | len(p.bytes): %d", len(p.bytes))
 
 	lex := lexer.New()
 	lex.Run(p.bytes)
 	firstPass = lex.Tokens
 
-	tlog.Info("parserCSS.Run() | len(firstPass): %d", len(firstPass))
-	tlog.Info("parserCSS.Run() | p.Config.Comments: %#v", p.Config.Comments)
-	tlog.Info("parserCSS.Run() | p.Config.Newlines: %q", p.Config.Newlines)
+	tlog.Debug("parserCSS.Run() | len(firstPass): %d", len(firstPass))
+	tlog.Debug("parserCSS.Run() | p.Config.Comments: %#v", p.Config.Comments)
+	tlog.Debug("parserCSS.Run() | p.Config.Newlines: %q", p.Config.Newlines)
 	// tlog.Info("parserCSS.Run() | len(lex.GetTokens()): %d", len(lex.GetTokens()))
 
 	var lastToken lexer.Token
@@ -86,18 +160,19 @@ func (p *ParserCSS) Run(bytes ...[]byte) (css *CssFile, err error) {
 			}
 		default:
 			switch tok.Type {
+			// case lexer.TokenAtCharSet:
+			// 	if i == 0 {
+			// 		secondPass = append(secondPass, tok)
+			// 	}
 			case lexer.TokenAtImport:
-				if p.Config.Imports {
-					imports = append(imports, string(tok.Value))
-				}
 				matches := regexCSSimports.FindAllSubmatch(tok.Value, -1)
 				for _, m := range matches {
 					if len(m) > 1 && len(m[1]) > 0 {
-						// tlog.Warn("parserCSS.Run() | @import %q", m[1])
+						tlog.Debug("parserCSS.Run() | @import %q", m[1])
 						tok.Value = m[1]
 						secondPass = append(secondPass, tok)
 					} else {
-						// tlog.Error("parserCSS.Run() | @import %q (%T)", m, m)
+						tlog.Error("parserCSS.Run() | @import %q (%T)", m, m)
 					}
 				}
 				// match0 := string(matches[0])
@@ -140,13 +215,33 @@ func (p *ParserCSS) Run(bytes ...[]byte) (css *CssFile, err error) {
 	for _, tok := range secondPass {
 		switch tok.Type {
 		case lexer.TokenAtImport:
-			css.body += "@import " + string(tok.Value) + ";"
+			impValue := string(tok.Value)
+			tlog.Debug("parserCSS.Run() | import: %q", impValue)
+			css.body += "@import " + impValue + ";"
+			// css.imports = append(css.imports, p.path+"/"+impValue)
+			// p.imports = append(p.imports, path.Dir(p.path)+"/"+impValue)
+			/*
+
+				BREATH
+
+			*/
+			imp := AtImport{
+				path:   path.Join(path.Dir(p.path), impValue),
+				name:   impValue,
+				source: p.path,
+			}
+			p.imports[imp.name] = imp
+			/*
+
+				BREATH
+
+			*/
 		case lexer.TokenLineFeed:
 			switch p.Config.Newlines {
 			case "remove":
 				// Adiós!
 			case "merge":
-				if lastToken.Type != lexer.TokenLineFeed {
+				if lastToken.Type != lexer.TokenLineFeed && lastToken.InComment == false {
 					css.body += string(tok.Value)
 				}
 			default:
@@ -158,8 +253,8 @@ func (p *ParserCSS) Run(bytes ...[]byte) (css *CssFile, err error) {
 		lastToken = tok
 	}
 
-	tlog.Warn("parserCSS.Run() | len(lex.Tokens): %d", len(lex.Tokens))
-	tlog.Warn("parserCSS.Run() | css.body:\n%s", css.body)
+	// tlog.Warn("parserCSS.Run() | len(lex.Tokens): %d", len(lex.Tokens))
+	// tlog.Warn("parserCSS.Run() | css.body:\n%s", css.body)
 
 	// result.processComplete = true
 
@@ -184,8 +279,8 @@ func (p *ParserCSS) Run(bytes ...[]byte) (css *CssFile, err error) {
 	// 	fmt.Print(string(tok.Value))
 	// }
 
-	for i, imp := range css.imports {
-		tlog.Info("parserCSS.Run() | %03d | imp: %q", i, imp)
+	for k, v := range p.imports {
+		tlog.Debug("parserCSS.Run() | %q | imp: %s", k, v.String())
 		// Go Routine those imports
 	}
 
@@ -193,9 +288,15 @@ func (p *ParserCSS) Run(bytes ...[]byte) (css *CssFile, err error) {
 }
 
 func NewCSS(path ...string) (proc *ParserCSS) {
-	proc = &ParserCSS{}
+	proc = &ParserCSS{
+		imports: map[string]AtImport{},
+	}
 	if len(path) > 0 {
 		proc.path = path[0]
 	}
 	return
+}
+
+func init() {
+	tlog.Level = termlog.InfoLevel
 }

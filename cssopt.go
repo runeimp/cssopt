@@ -29,7 +29,10 @@ type Optimizer struct {
 }
 
 func (opt *Optimizer) processFilePath(path string) (result *parser.CssFile, err error) {
-	var fileBytes []byte
+	var (
+		files []*parser.CssFile
+		res   *parser.CssFile
+	)
 
 	tlog.Level = termlog.WarnLevel
 	tlog.Info("optimizer.processFilePath() | path: %q", path)
@@ -40,45 +43,51 @@ func (opt *Optimizer) processFilePath(path string) (result *parser.CssFile, err 
 	// 	return result, err
 	// }
 
-	// result = CssFile{
-	// 	path:   path,
-	// 	source: fileBytes,
-	// }
+	// tlog.Debug("optimizer.processFilePath() | fileBytes: %q", string(fileBytes))
 
-	tlog.Debug("optimizer.processFilePath() | fileBytes: %q", string(fileBytes))
-
-	proc := parser.NewCSS(path)
-	proc.Config = opt.config
-	result, err = proc.Run()
+	result, err = parseCssFiles(path, opt.config)
 	if err != nil {
 		return result, err
 	}
+	tlog.Warn("optimizer.processFilePath() | path: %q | res.GetBodyLength(): %d", path, result.GetBodyLength())
+	// files = append(files, result)
 
-	/*
-		lex := lexer.New(fileBytes)
-		lex.Lex()
+	tlog.Warn("optimizer.processFilePath() | res: %s", result)
+	imports := result.GetImports()
+	tlog.Warn("optimizer.processFilePath() | len(imports): %d", len(imports))
 
-		tlog.Info("optimizer.processFilePath() | len(lex.Tokens): %d", len(lex.Tokens))
-		// tlog.Info("optimizer.processFilePath() | len(lex.GetTokens()): %d", len(lex.GetTokens()))
+	for k, v := range imports {
+		// tlog.Warn("optimizer.processFilePath() | %q | import: %s", k, v.String())
+		tlog.Info("optimizer.processFilePath() | %q | path: %q", k, v.GetPath())
+		res, err = parseCssFiles(v.GetPath(), opt.config)
+		if err != nil {
+			return result, err
+		}
+		tlog.Info("optimizer.processFilePath() | %q | res.GetBodyLength(): %d", k, res.GetBodyLength())
+		files = append(files, res)
+		tlog.Info("optimizer.processFilePath() | %q | len(imports): %d", k, len(imports))
+	}
 
-		// result.processComplete = true
+	// tlog.Error("optimizer.processFilePath() | Results | len(result): %d", len(result))
 
-		const infoFormat = "optimizer.processFilePath(%q) | comment: %-5t | %-9s |	 %s"
-		for _, tok := range lex.Tokens {
-			// tlog.Info("optimizer.processFilePath(%q) | i: %03d | tok: %s", path, i, tok)
-			// tlog.Info("optimizer.processFilePath(%q) | tok: %s", path, tok)
-			// msg := fmt.Sprintf("%17s: ", string(t.Type))
+	// Merge Imports?
+	if opt.config.Imports {
+		for i, file := range files {
+			// tlog.Error("optimizer.processFilePath() | %d | file.GetPath(): %q\n%s", i, file.GetPath(), file.GetBody())
+			tlog.Error("optimizer.processFilePath() | %d | file.GetPath(): %q", i, file.GetPath())
 
-			switch tok.Type {
-			case lexer.TokenCarriageReturn:
-				tlog.Info(infoFormat, path, tok.InComment, tok.Type, `\r`)
-			case lexer.TokenLineFeed:
-				tlog.Info(infoFormat, path, tok.InComment, tok.Type, `\n`)
-			default:
-				tlog.Info(infoFormat, path, tok.InComment, tok.Type, string(tok.Value))
+			for k, v := range result.GetImports() {
+				if file.GetPath() == v.GetPath() {
+					target := "@import " + k
+					tlog.Warn("optimizer.processFilePath() | %q | %q", target, v.GetPath())
+					result.ReplaceImport(target, file.GetBody())
+				}
 			}
 		}
-	*/
+	}
+
+	// tlog.Error("optimizer.processFilePath() | %q | %s", result[0].GetPath(), result[0].GetBody())
+
 	// os.Stdout.Write(data.File)
 
 	return result, err
@@ -106,8 +115,8 @@ func (opt *Optimizer) ProcessSlicesOfBytes(css [][]byte) (result string) {
 
 func (opt *Optimizer) ProcessPath(path string) (result string, err error) {
 	var (
-		// cssFile *parser.CssFile
-		finfo fs.FileInfo
+		cssFile *parser.CssFile
+		finfo   fs.FileInfo
 	)
 	tlog.Info("optimizer.ProcessPath() | path: %q", path)
 
@@ -123,8 +132,10 @@ func (opt *Optimizer) ProcessPath(path string) (result string, err error) {
 		return result, err
 	}
 
-	// cssFile, err = opt.processFilePath(path)
-	_, err = opt.processFilePath(path)
+	cssFile, err = opt.processFilePath(path)
+	// _, err = opt.processFilePath(path)
+
+	result = cssFile.GetBody()
 
 	// for i, imp := range cssFile.imports {
 	// 	tlog.Info("optimizer.ProcessPath() | %03d | imp: %q", i, imp)
@@ -141,7 +152,7 @@ func (opt *Optimizer) ProcessPath(path string) (result string, err error) {
 
 func init() {
 	// tlog = termlog.New()
-	tlog.Level = termlog.InfoLevel
+	tlog.Level = termlog.DebugLevel
 }
 
 func GetOptimizer(conf *configuration.Config) *Optimizer {
@@ -152,6 +163,22 @@ func GetOptimizer(conf *configuration.Config) *Optimizer {
 	}
 
 	return optimizer
+}
+
+func parseCssFiles(path string, config *configuration.Config) (result *parser.CssFile, err error) {
+	tlog.Warn("cssopt.parseCssFiles() | path: %q", path)
+	proc := parser.NewCSS(path)
+	proc.Config = config
+	result, err = proc.Run()
+	if err != nil {
+		return result, err
+	}
+
+	for _, imp := range proc.GetImports() {
+		result.AddImport(imp)
+	}
+
+	return result, err
 }
 
 func pathInfo(path string) (fs.FileInfo, error) {
@@ -171,5 +198,3 @@ func pathInfo(path string) (fs.FileInfo, error) {
 
 	return finfo, nil
 }
-
-//
